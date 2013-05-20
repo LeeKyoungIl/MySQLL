@@ -2,7 +2,8 @@
 
 /**
 * ● author - LeeKyoungIl / leekyoungil@gmail.com
-* ● blog - http://blog.leekyoungil.com  
+* ● blog - http://blog.leekyoungil.com 
+* ● github - https://github.com/LeeKyoungIl/MySQLL
 * ● copyright - (c) 2013 - Lee Kyoung Il
 * ● class name - MySQLL / Easy PHP-MySQL Connect Module   
 *                       
@@ -24,6 +25,7 @@
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 * 
 */
+
 
 Class MySQLL {
 	private $connectObj = Array();
