@@ -175,19 +175,15 @@ Class MySQLL {
 			case 'om' :
 				if ($this->masterCnt == 1) {
 					$dbObj['write'][0] = $this->connectDb($this->connectObj['config'], $this->connectObj['dbconnect']['master'][0]);
+					$dbObj['read'][0] = &$dbObj['write'][0];
 				} else {
 					for ($i=0; $i<$this->masterCnt; $i++) {
 						$dbObj['write'][$i] = $this->connectDb($this->connectObj['config'], $this->connectObj['dbconnect']['master'][$i]);
-					}
-				}
-				
-				if ($this->slaveCnt == 1) {
-					$dbObj['read'][0] = &$dbObj['write'][0];
-				} else {
-					for ($i=0; $i<$this->slaveCnt; $i++) {
 						$dbObj['read'][$i] = &$dbObj['write'][$i];
 					}
 				}
+				
+				$this->slaveCnt = $this->masterCnt;
 				
 				break;
 		}
