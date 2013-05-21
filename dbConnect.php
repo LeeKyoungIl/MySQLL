@@ -27,13 +27,13 @@
 */
 
 #-> DB config
-require_once $_SERVER['DOCUMENT_ROOT'] . 'db/config/setup.MySQLL.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . 'MySQLL/config/setup.MySQLL.php';
 #-> DB class
-require_once $_SERVER['DOCUMENT_ROOT'] . 'db/class/class.MySQLL.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . 'MySQLL/class/class.MySQLL.php';
 
 #-> create new DB instance 
 $ObjMySQLL = new MySQLL($dbInfo, $config);
 
 #-> DB disconnect
-require_once $_SERVER['DOCUMENT_ROOT'] . 'db/dbDisconnect.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . 'MySQLL/dbDisconnect.php';
 ?>
