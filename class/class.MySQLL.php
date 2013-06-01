@@ -117,8 +117,13 @@ Class MySQLL {
 			$tmpCheck['write'][$i]['time'][0] = $tmpCheck['write'][$i][7][1];
 		}
 
-		$readObj = $this->quickSort($tmpCheck['read']);
 		$writeObj = $this->quickSort($tmpCheck['write']);
+
+		if ($this->slaveCnt == 0) {
+			$readObj = &$writeObj;
+		}  else {
+			$readObj = $this->quickSort($tmpCheck['read']);
+		}
 
 		$this->objMySQL['read'] = $tmpDbObj['read'][$readObj[0][1]];
 		$this->objMySQL['write'] = $tmpDbObj['write'][$writeObj[0][1]];	
@@ -133,7 +138,7 @@ Class MySQLL {
 		$dbObj = Array();
 		
 		$this->masterCnt = count($this->connectObj['dbconnect']['master']);
-		$this->slaveCnt = count($this->connectObj['dbconnect']['slave']);
+		$this->slaveCnt = (array_key_exists('slave', $this->connectObj['dbconnect'])) ? count($this->connectObj['dbconnect']['slave']) : 0;
 		
 		switch ($this->connectObj['config']['composition']) {
 			case 's' : 
@@ -278,7 +283,34 @@ Class MySQLL {
 	}
 	
 	/**
-     * DB Connect
+	 * DB selectDb
+	 *
+	 * @param dbName $dbName DB name
+	 *
+	 * @return void
+	 */
+	public function selectDb ($dbName) {
+		switch ($this->connectObj['config']['mysqlClassType']) {
+			case 'mysql' :
+			case 'mysqlp' :
+				mysql_select_db($dbName, $this->objMySQL['read']) or die('Data base select failed!');
+				mysql_select_db($dbName, $this->objMySQL['write']) or die('Data base select failed!');
+				break;
+		
+			case 'mysqli' :
+				if ($this->phpVersion[0] >= 5 && $this->phpVersion[1] >= 3) {
+					$this->objMySQL['read']->select_db($dbName);
+					$this->objMySQL['write']->select_db($dbName);
+				} else {
+					mysqli_select_db($this->objMySQL['read'], $dbName);
+					mysqli_select_db($this->objMySQL['write'], $dbName);
+				}
+				break;
+		}
+	}
+	
+	/**
+     * DB charsetProcess
      *
      * @param dbObj $dbObj DB Object
      * @param String $dbCharset DB encoding 
