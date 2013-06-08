@@ -9,7 +9,7 @@
 *                       
 * ● requires PHP 5.3.x and either MySQL 5.x                                                                              
 *
-* ● version - 0.1 (2013/05/20)
+* ● version - 0.2 (2013/06/8)
 * 
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -101,17 +101,16 @@ Class MySQLL {
 		$tmpCheck = Array();
 		
 		$phpChk = ( ($this->connectObj['config']['mysqlClassType'] == 'mysqli' && $this->phpVersion[0] >= 5 && $this->phpVersion[1] >= 3) ? true : false );
-		$loopCnt = ($this->slaveCnt > $this->masterCnt) ? $this->slaveCnt : $this->masterCnt;
 	
 		for ($i=0; $i<$this->slaveCnt; $i++) {
-			$tmpCheck['read'][$i] = explode("  ", ( ($phpChk) ? $tmpDbObj['read'][$i]->stat() : ($this->connectObj['config']['mysqlClassType'] == 'mysqli') ? mysqli_stat($tmpDbObj['read'][0]) : mysql_stat($tmpDbObj['read'][0]) ));
+			$tmpCheck['read'][$i] = explode("  ", ( ($phpChk) ? $tmpDbObj['read'][$i]->stat() : ($this->connectObj['config']['mysqlClassType'] == 'mysqli') ? mysqli_stat($tmpDbObj['read'][$i]) : mysql_stat($tmpDbObj['read'][$i]) ));
 			$tmpCheck['read'][$i][7] = explode(": ", $tmpCheck['read'][$i][7]);
 			$tmpCheck['read'][$i]['time'][1] = $i;
 			$tmpCheck['read'][$i]['time'][0] = $tmpCheck['read'][$i][7][1];
 		}
 		
 		for ($i=0; $i<$this->masterCnt; $i++) {
-			$tmpCheck['write'][$i] = explode("  ", ( ($phpChk) ? $tmpDbObj['write'][$i]->stat() :  ($this->connectObj['config']['mysqlClassType'] == 'mysqli') ? mysqli_stat($tmpDbObj['write'][0]) : mysql_stat($tmpDbObj['write'][0]) ));
+			$tmpCheck['write'][$i] = explode("  ", ( ($phpChk) ? $tmpDbObj['write'][$i]->stat() :  ($this->connectObj['config']['mysqlClassType'] == 'mysqli') ? mysqli_stat($tmpDbObj['write'][$i]) : mysql_stat($tmpDbObj['write'][$i]) ));
 			$tmpCheck['write'][$i][7] = explode(": ", $tmpCheck['write'][$i][7]);
 			$tmpCheck['write'][$i]['time'][1] = $i;
 			$tmpCheck['write'][$i]['time'][0] = $tmpCheck['write'][$i][7][1];
@@ -124,7 +123,7 @@ Class MySQLL {
 		}  else {
 			$readObj = $this->quickSort($tmpCheck['read']);
 		}
-
+		
 		$this->objMySQL['read'] = $tmpDbObj['read'][$readObj[0][1]];
 		$this->objMySQL['write'] = $tmpDbObj['write'][$writeObj[0][1]];	
 	}
@@ -487,8 +486,9 @@ Class MySQLL {
 	
 			$timeName = explode(' ', $sql);
 			$timeName = trim($timeName[0]);
-	
-			$this->queryLog[] = $timeName." : (".substr($this->endTime-$this->startTime, 0, 6)." sec) ".$sql;
+			
+			$serverName = ($dbObj != null && is_a($dbObj, $this->connectObj['config']['mysqlClassType']) && property_exists($this->connectObj['config']['mysqlClassType'], 'host_info')) ? $dbObj->host_info.' : ' : '';
+			$this->queryLog[] = $serverName.$timeName." : (".substr($this->endTime-$this->startTime, 0, 6)." sec) ".$sql;
 		}
 	
 		return $result;
@@ -604,7 +604,7 @@ Class MySQLL {
 					default      : $rows = $this->dbReturn_fetchAssoc($result); break;
 				}
 	
-				$returnRows['resultValue'] = $rows;
+				//$returnRows['resultValue'] = $rows;
 	
 				mysqli_next_result($this->objMySQL['read']);
 			}
