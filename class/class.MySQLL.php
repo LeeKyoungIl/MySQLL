@@ -9,7 +9,7 @@
 *                       
 * ● requires PHP 5.3.x and either MySQL 5.x                                                                              
 *
-* ● version - 0.2 (2013/06/8)
+* ● version - 0.3 (2013/06/18)
 * 
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -25,7 +25,6 @@
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 * 
 */
-
 
 Class MySQLL {
 	private $connectObj = Array();
@@ -48,13 +47,14 @@ Class MySQLL {
      *
      * @return void
      */
-	public function __construct (&$dbInfo, &$config) {
+	public function __construct () {
+		#-> DB config
+		require_once $_SERVER['DOCUMENT_ROOT'] . 'DataCloud/Db/MySQLL/config/setup.MySQLL.php';
+		
 		$this->phpVersion = explode('.', phpversion());
 		
 		$this->connectObj['dbconnect'] = $dbInfo;
 		$this->connectObj['config'] = $config;
-		
-		$this->selectDbHost();
 	}
 	
 	/**
@@ -96,7 +96,7 @@ Class MySQLL {
      * 
      * @return void
      */
-	private function selectDbHost () {
+	public function selectDbHost () {
 		$tmpDbObj = $this->connect();
 		$tmpCheck = Array();
 		
@@ -568,6 +568,8 @@ Class MySQLL {
 			else { $sql = 'call ' . $spName . '('.$vars.')'; }
 		}
 	
+		$returnRows = null;
+		
 		if ($output) {
 			$result =  $this->resultReturn($sql, $this->objMySQL['read']);
 
@@ -806,15 +808,22 @@ Class MySQLL {
      *
      * @return void
      */
-    function closeMySQL ()
-    { 
+    function closeMySQL () {
+    	if ($this->connectObj['config']['queryDebug']) {
+    		$this->printQueryLog(true);
+    	}
+    	
+    	$chekLength = 0;
+    	 
         if ($this->connectObj['config']['mysqlClassType'] == 'mysqli') {
         	mysqli_close($this->objMySQL['read']);
-        	if ($this->connectObj['config']['composition'] != 's') { mysqli_close($this->objMySQL['write']); }
+        	$chekLength = @strlen($this->objMySQL['write']->host_info);
+        	if ($this->connectObj['config']['composition'] != 's' && ($chekLength > 0)) { mysqli_close($this->objMySQL['write']); }
         }
         else {
         	mysql_close($this->objMySQL['read']);
-        	if ($this->connectObj['config']['composition'] != 's') { mysql_close($this->objMySQL['write']); }
+        	$chekLength = @strlen($this->objMySQL['write']->host_info);
+        	if ($this->connectObj['config']['composition'] != 's' && ($chekLength > 0)) { mysql_close($this->objMySQL['write']); }
         }
     }
 }
