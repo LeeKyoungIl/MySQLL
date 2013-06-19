@@ -9,7 +9,7 @@
 *                       
 * ● requires PHP 5.3.x and either MySQL 5.x                                                                              
 *
-* ● version - 0.3 (2013/06/18)
+* ● version - 0.4 (2013/06/19)
 * 
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -572,6 +572,10 @@ Class MySQLL {
 		
 		if ($output) {
 			$result =  $this->resultReturn($sql, $this->objMySQL['read']);
+			
+			if (!$result || !is_a($result, $this->connectObj['config']['mysqlClassType'].'_result')) {
+				return $this->dbReturn_MySQLError(false);
+			}
 
 			if (!$multiple) {
 				switch ($type) {
@@ -598,6 +602,10 @@ Class MySQLL {
 	
 				$sql    = 'SELECT ' . $outResult;
 				$result =  $this->resultReturn($sql, $this->objMySQL['read']);
+				
+				if (!$result || !is_a($result, $this->connectObj['config']['mysqlClassType'].'_result')) {
+					return $this->dbReturn_MySQLError(false);
+				}
 	
 				switch ($type) {
 					case 'Assoc' : $rows = $this->dbReturn_fetchAssoc($result); break;
