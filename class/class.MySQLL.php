@@ -9,7 +9,7 @@
 *                       
 * ● requires PHP 5.3.x and either MySQL 5.x                                                                              
 *
-* ● version - 0.4 (2013/06/19)
+* ● version - 0.5 (2013/06/20)
 * 
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -444,16 +444,17 @@ Class MySQLL {
      * @return String or void
      */
 	private function dbReturn_MySQLError ($print) {
+		$verChk = ($this->phpVersion[0] >= 5 && $this->phpVersion[1] >= 3) ? true : false;
 		if ($print) {
 			print "<pre>";
         	print_r(($this->connectObj['config']['mysqlClassType'] == 'mysqli') 
-					? mysqli_error($this->objMySQL['read'])
-					: mysql_error($this->objMySQL['read']));
+					? ($verChk) ? $this->objMySQL['read']->error : mysqli_error($this->objMySQL['read'])
+					: ($verChk) ? $this->objMySQL['read']->error : mysql_error($this->objMySQL['read']));
 			print "</pre>";
 		} else {
 			return ($this->connectObj['config']['mysqlClassType'] == 'mysqli') 
-					? mysqli_error($this->objMySQL['read'])
-					: mysql_error($this->objMySQL['read']);
+					? ($verChk) ? $this->objMySQL['read']->error : mysqli_error($this->objMySQL['read'])
+					: ($verChk) ? $this->objMySQL['read']->error : mysql_error($this->objMySQL['read']);
 		}
 	}
 	
@@ -572,9 +573,9 @@ Class MySQLL {
 		
 		if ($output) {
 			$result =  $this->resultReturn($sql, $this->objMySQL['read']);
-			
-			if (!$result || !is_a($result, $this->connectObj['config']['mysqlClassType'].'_result')) {
-				return $this->dbReturn_MySQLError(false);
+	
+			if ($this->dbReturn_MySQLError(false)) {
+				return $this->dbReturn_MySQLError(true);
 			}
 
 			if (!$multiple) {
@@ -603,8 +604,8 @@ Class MySQLL {
 				$sql    = 'SELECT ' . $outResult;
 				$result =  $this->resultReturn($sql, $this->objMySQL['read']);
 				
-				if (!$result || !is_a($result, $this->connectObj['config']['mysqlClassType'].'_result')) {
-					return $this->dbReturn_MySQLError(false);
+				if ($this->dbReturn_MySQLError(false)) {
+					return $this->dbReturn_MySQLError(true);
 				}
 	
 				switch ($type) {
