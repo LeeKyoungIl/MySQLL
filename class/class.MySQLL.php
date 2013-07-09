@@ -621,7 +621,7 @@ Class MySQLL {
 				}
 			}
 	
-			mysqli_next_result($this->objMySQL['read']);
+			$this->dbReturn_NextResult($this->objMySQL['read']);
 	
 			if ($outResult != null) {
 				unset($rows);
@@ -642,7 +642,7 @@ Class MySQLL {
 	
 				//$returnRows['resultValue'] = $rows;
 	
-				mysqli_next_result($this->objMySQL['read']);
+				$this->dbReturn_NextResult($this->objMySQL['read']);
 			}
 	
 			return $returnRows;
@@ -650,13 +650,13 @@ Class MySQLL {
 		else {
 			if ($this->connectObj['config']['composition'] == 's') {
 				$result = $this->resultReturn($this->objMySQL['read']);
-				mysqli_next_result($this->objMySQL['read']);
+				$this->dbReturn_NextResult($this->objMySQL['read']);
 			}
 			else {
 				$actDb = ($input != true) ? $this->objMySQL['read'] : $this->objMySQL['write'];
 	
 				$result = $this->resultReturn($sql, $actDb);
-				mysqli_next_result($actDb);
+				$this->dbReturn_NextResult($actDb);
 			}
 	
 			return $result;
