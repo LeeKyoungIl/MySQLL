@@ -49,7 +49,7 @@ Class MySQLL {
      */
 	public function __construct () {
 		#-> DB config
-		require_once $_SERVER['DOCUMENT_ROOT'] . 'DataCloud/Db/MySQLL/config/setup.MySQLL.php';
+		require_once $_SERVER['DOCUMENT_ROOT'] . 'your path/MySQLL/config/setup.MySQLL.php';
 		
 		$this->phpVersion = explode('.', phpversion());
 		
@@ -457,6 +457,31 @@ Class MySQLL {
 					: ($verChk) ? $this->objMySQL['read']->error : mysql_error($this->objMySQL['read']);
 		}
 	}
+	
+	/**
+     * MySQL next result check
+     *
+     * @param dbObj $mysqlObj 
+     *
+     * @return void
+     */
+        private function dbReturn_NextResult (&$mysqlObj) {
+                if (!$mysqlObj) {
+                        return false;
+                }
+
+                $verChk = ($this->phpVersion[0] >= 5 && $this->phpVersion[1] >= 3) ? true : false;
+
+                if ($verChk) {
+                        if ($mysqlObj->more_results()) {
+                                $mysqlObj->next_result();
+                        }
+                } else {
+                        if ($mysqlObj->more_results()) {
+                                mysqli_next_results($mysqlObj);
+                        }
+                }
+        }
 	
 	/**
      * print MySQL Query error message
