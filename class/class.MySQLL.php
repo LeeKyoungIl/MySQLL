@@ -9,7 +9,7 @@
 *                       
 * ● requires PHP 5.3.x and either MySQL 5.x                                                                              
 *
-* ● version - 0.6 (2013/07/07)
+* ● version - 0.7 (2013/07/29)
 * 
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -49,8 +49,8 @@ Class MySQLL {
      */
 	public function __construct () {
 		#-> DB config
-		require_once $_SERVER['DOCUMENT_ROOT'] . 'your path/MySQLL/config/setup.MySQLL.php';
-		
+		require_once $_SERVER['DOCUMENT_ROOT'] . 'DataCloud/Db/MySQLL/config/setup.MySQLL.php';	
+	
 		$this->phpVersion = explode('.', phpversion());
 		
 		$this->connectObj['dbconnect'] = $dbInfo;
@@ -443,45 +443,50 @@ Class MySQLL {
      *
      * @return String or void
      */
-	private function dbReturn_MySQLError ($print) {
+	private function dbReturn_MySQLError ($print, &$mysqlObj) {
+		if (!$mysqlObj) {
+			return false;
+		}
+		
 		$verChk = ($this->phpVersion[0] >= 5 && $this->phpVersion[1] >= 3) ? true : false;
+		
 		if ($print) {
 			print "<pre>";
         	print_r(($this->connectObj['config']['mysqlClassType'] == 'mysqli') 
-					? ($verChk) ? $this->objMySQL['read']->error : mysqli_error($this->objMySQL['read'])
-					: ($verChk) ? $this->objMySQL['read']->error : mysql_error($this->objMySQL['read']));
+					? (($verChk) ? $mysqlObj->error : mysqli_error($mysqlObj))
+					: (($verChk) ? $mysqlObj->error : mysql_error($mysqlObj)));
 			print "</pre>";
 		} else {
 			return ($this->connectObj['config']['mysqlClassType'] == 'mysqli') 
-					? ($verChk) ? $this->objMySQL['read']->error : mysqli_error($this->objMySQL['read'])
-					: ($verChk) ? $this->objMySQL['read']->error : mysql_error($this->objMySQL['read']);
+					? (($verChk) ? $mysqlObj->error : mysqli_error($mysqlObj))
+					: (($verChk) ? $mysqlObj->error : mysql_error($mysqlObj));
 		}
 	}
 	
 	/**
-     * MySQL next result check
-     *
-     * @param dbObj $mysqlObj 
-     *
-     * @return void
-     */
-        private function dbReturn_NextResult (&$mysqlObj) {
-                if (!$mysqlObj) {
-                        return false;
-                }
-
-                $verChk = ($this->phpVersion[0] >= 5 && $this->phpVersion[1] >= 3) ? true : false;
-
-                if ($verChk) {
-                        if ($mysqlObj->more_results()) {
-                                $mysqlObj->next_result();
-                        }
-                } else {
-                        if ($mysqlObj->more_results()) {
-                                mysqli_next_results($mysqlObj);
-                        }
-                }
-        }
+	 * MySQL next result check
+	 *
+	 * @param dbObj $mysqlObj
+	 *
+	 * @return void
+	 */
+	private function dbReturn_NextResult (&$mysqlObj) {
+		if (!$mysqlObj) {
+			return false;
+		}
+	
+		$verChk = ($this->phpVersion[0] >= 5 && $this->phpVersion[1] >= 3) ? true : false;
+	
+		if ($verChk) {
+			if ($mysqlObj->more_results()) {
+				$mysqlObj->next_result();
+			}
+		} else {
+			if ($mysqlObj->more_results()) {
+				mysqli_next_results($mysqlObj);
+			}
+		}
+	}
 	
 	/**
      * print MySQL Query error message
@@ -544,7 +549,7 @@ Class MySQLL {
 		$result = $this->resultReturn($sql, $this->objMySQL['read']);
 		
 		if (!$result) {
-			return $this->dbReturn_MySQLError(false);
+			return $this->dbReturn_MySQLError(false, $this->objMySQL['read']);
 		}
 
 		$returnRows = null;	
@@ -597,10 +602,10 @@ Class MySQLL {
 		$returnRows = null;
 		
 		if ($output) {
-			$result =  $this->resultReturn($sql, $this->objMySQL['read']);
+			$result = $this->resultReturn($sql, $this->objMySQL['read']);
 	
-			if (!is_a($result, $this->connectObj['config']['mysqlClassType'].'_result') || $this->dbReturn_MySQLError(false)) {
-				return $this->dbReturn_MySQLError(false);
+			if (!is_a($result, $this->connectObj['config']['mysqlClassType'].'_result') || $this->dbReturn_MySQLError(false, $this->objMySQL['read'])) {
+				return $this->dbReturn_MySQLError(false, $this->objMySQL['read']);
 			}
 
 			if (!$multiple) {
@@ -629,8 +634,8 @@ Class MySQLL {
 				$sql    = 'SELECT ' . $outResult;
 				$result =  $this->resultReturn($sql, $this->objMySQL['read']);
 				
-				if (!is_a($result, $this->connectObj['config']['mysqlClassType'].'_result') || $this->dbReturn_MySQLError(false)) {
-					return $this->dbReturn_MySQLError(false);
+				if (!is_a($result, $this->connectObj['config']['mysqlClassType'].'_result') || $this->dbReturn_MySQLError(false, $this->objMySQL['read'])) {
+					return $this->dbReturn_MySQLError(false, $this->objMySQL['read']);
 				}
 	
 				switch ($type) {
@@ -640,14 +645,11 @@ Class MySQLL {
 					default      : $rows = $this->dbReturn_fetchAssoc($result); break;
 				}
 	
-				//$returnRows['resultValue'] = $rows;
-	
 				$this->dbReturn_NextResult($this->objMySQL['read']);
 			}
 	
 			return $returnRows;
-		}
-		else {
+		} else {
 			if ($this->connectObj['config']['composition'] == 's') {
 				$result = $this->resultReturn($this->objMySQL['read']);
 				$this->dbReturn_NextResult($this->objMySQL['read']);
@@ -681,7 +683,7 @@ Class MySQLL {
         $result = $this->resultReturn($sql, $this->objMySQL['read']);
 
 		if (!$result) {
-			return $this->dbReturn_MySQLError(false);
+			return $this->dbReturn_MySQLError(false, $this->objMySQL['read']);
 		}
 
         if ($group)  { while($row = $this->dbReturn_fetchRow($result)) { $returnRows[] = $row; } }
@@ -706,7 +708,7 @@ Class MySQLL {
         $result = $this->resultReturn($sql, $this->objMySQL['read']);
         
 		if (!$result) {
-			return $this->dbReturn_MySQLError(false);
+			return $this->dbReturn_MySQLError(false, $this->objMySQL['read']);
 		}
 
 		$row = $this->dbReturn_fetchRow($result);
@@ -766,6 +768,102 @@ Class MySQLL {
 
         return $this->resultReturn($sql, $actDb);
     }
+    
+    /**
+     * createTable
+     *
+     * @param String $tableName table name
+     * @param Array $fields
+     * * @param Array $dataTypes
+     * * @param Array $dataSizes
+     *
+     * @return int or boolean
+     */
+    function createTable ($tableName, $fields, $dataTypes, $dataSizes) {
+    	if (is_array($fields) && is_array($dataTypes) && is_array($dataSizes)) {
+    		$createTable = Array();
+    		
+    		
+    		foreach ($fields as $key => $var) {
+    			if (!$fields[$key] ||  $fields[$key] == '') {
+    				continue;
+    			}
+    			
+    			$creataTable[] = $fields[$key].' '.$dataTypes[$key]. (($dataTypes[$key] == 'timestamp') ? ' ' : '('.$dataSizes[$key].')') . (($var == 'id') ? ' NOT NULL AUTO_INCREMENT PRIMARY KEY' : ' NULL');
+    		}
+    		
+    		if (count($creataTable) > 0) {
+    			$creataTable = 'CREATE TABLE ' .$tableName. '(' . implode(',', $creataTable) . ') ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;';
+    		}
+    		
+    		$actDb = ($this->connectObj['config']['composition'] == 's') ? $this->objMySQL['read'] : $this->objMySQL['write'];
+
+        	return $this->resultReturn($creataTable, $actDb);
+    	}
+    	
+    	return false;
+    }
+    
+    /**
+     * alterTable
+     *
+     * @param String $type alter type
+     * @param String $tableName table name
+     * @param Array $fields
+     * * @param Array $dataTypes
+     * * @param Array $dataSizes
+     *
+     * @return int or boolean
+     */
+    function alterTable ($type, $tableName, $fieldName=null, $dataType=null, $dataSize=null, $fields=null) {
+    	$actDb = ($this->connectObj['config']['composition'] == 's') ? $this->objMySQL['read'] : $this->objMySQL['write'];
+
+    	switch ($type) {
+    		case 'RENAME' :
+    			if (is_array($tableName) && array_key_exists('old', $tableName) && array_key_exists('new', $tableName)) {
+    				return $this->resultReturn('ALTER TABLE '.$tableName['old'].' '.$type.' '.$tableName['new'].';', $actDb);
+    			}
+    			break;
+    			
+    		case 'CHANGE' :
+    			if ($tableName && is_array($fieldName) && $dataType && $dataSize) {
+    				return $this->resultReturn('ALTER TABLE '.$tableName.' '.$type.' '.$fieldName['old'].' '.$fieldName['new'].' '.$dataType.'('.$dataSize.');', $actDb);
+    			}
+    			
+    			break;
+    			
+    		case 'ADD' :
+    			if ($tableName && $fieldName && $dataType && $dataSize) {
+    				return $this->resultReturn('ALTER TABLE '.$tableName.' '.$type.' '.$fieldName.' '.$dataType.'('.$dataSize.');', $actDb);
+    			}
+    			break;
+    			
+    		case 'ADD INDEX' :
+    		case 'ADD UNIQUE INDEX' :
+    			if ($tableName && $fieldName && $fields) { 
+    				return $this->resultReturn('ALTER TABLE '.$tableName.' '.$type.' '.$fieldName.' ('.$fields.');', $actDb);
+    			}
+    			break;
+    			
+    		case 'DROP' :
+    		case 'DROP INDEX' :
+    			if ($tableName && $fieldName) {
+    				return $this->resultReturn('ALTER TABLE '.$tableName.' '.$type.' '.$fieldName.';', $actDb);
+    			}
+    			break;
+    			
+    		case 'TRUNCATE' :
+    			if ($tableName) {
+    				return $this->resultReturn($type.' TABLE '.$tableName.';', $actDb);
+    			}
+    			break;
+    			
+    		case 'DROP TABLE' :
+    			if ($tableName) {
+    				return $this->resultReturn($type.' '.$tableName.';', $actDb);
+    			}
+    	}
+    }
 
     /**
      * show table status
@@ -780,7 +878,7 @@ Class MySQLL {
         $result = $this->resultReturn($sql, $this->objMySQL['read']);
         
         if (!$result) {
-        	return $this->dbReturn_MySQLError(false);
+        	return $this->dbReturn_MySQLError(false, $this->objMySQL['read']);
         }
 
         while($rows = $this->dbReturn_fetchAssoc($result)) { $returnRows[] = $rows; }
@@ -801,7 +899,7 @@ Class MySQLL {
         $result = $this->resultReturn($sql, $this->objMySQL['read']);
         
    	 	if (!$result) {
-        	$this->dbReturn_MySQLError(true);
+        	$this->dbReturn_MySQLError(true, $this->objMySQL['read']);
         }
     }
 
@@ -813,7 +911,7 @@ Class MySQLL {
         $result = $this->resultReturn($sql, $actDb);
         
 		if (!$result) {
-        	return $this->dbReturn_MySQLError(false);;
+        	return $this->dbReturn_MySQLError(false, $actDb);
         }
         
         return $result;
