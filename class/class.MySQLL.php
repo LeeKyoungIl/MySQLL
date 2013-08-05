@@ -9,7 +9,7 @@
 *                       
 * ● requires PHP 5.3.x and either MySQL 5.x                                                                              
 *
-* ● version - 0.7 (2013/07/29)
+* ● version - 0.8 (2013/08/05)
 * 
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
