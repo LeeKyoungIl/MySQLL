@@ -1,5 +1,8 @@
 <?php
 
+//error handler
+set_error_handler(create_function('$p1, $p2, $p3, $p4', 'throw new ErrorException($p2, 0, $p1, $p3, $p4);'), E_ALL);
+
 /**
 * ● author - LeeKyoungIl / leekyoungil@gmail.com
 * ● blog - http://blog.leekyoungil.com 
@@ -9,7 +12,7 @@
 *                       
 * ● requires PHP 5.3.x and either MySQL 5.x                                                                              
 *
-* ● version - 0.8 (2013/08/05)
+* ● version - 0.9 (2013/08/19)
 * 
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -38,6 +41,7 @@ Class MySQLL {
 	private $queryLog = Array();
 	
 	private $phpVersion = null;
+	private $queryErrorLogPath = 'your log path';
 	
 	/**
      * Construct Class
@@ -98,34 +102,40 @@ Class MySQLL {
      */
 	public function selectDbHost () {
 		$tmpDbObj = $this->connect();
-		$tmpCheck = Array();
 		
-		$phpChk = ( ($this->connectObj['config']['mysqlClassType'] == 'mysqli' && $this->phpVersion[0] >= 5 && $this->phpVersion[1] >= 3) ? true : false );
+		if (!is_array($tmpDbObj)) {
+			$this->objMySQL['read'] = null;
+			$this->objMySQL['write'] = null;
+		} else {
+			$tmpCheck = Array();
+			
+			$phpChk = ( ($this->connectObj['config']['mysqlClassType'] == 'mysqli' && $this->phpVersion[0] >= 5 && $this->phpVersion[1] >= 3) ? true : false );
+		
+			for ($i=0; $i<$this->slaveCnt; $i++) {
+				$tmpCheck['read'][$i] = explode("  ", ( ($phpChk) ? $tmpDbObj['read'][$i]->stat() : ($this->connectObj['config']['mysqlClassType'] == 'mysqli') ? mysqli_stat($tmpDbObj['read'][$i]) : mysql_stat($tmpDbObj['read'][$i]) ));
+				$tmpCheck['read'][$i][7] = explode(": ", $tmpCheck['read'][$i][7]);
+				$tmpCheck['read'][$i]['time'][1] = $i;
+				$tmpCheck['read'][$i]['time'][0] = $tmpCheck['read'][$i][7][1];
+			}
+			
+			for ($i=0; $i<$this->masterCnt; $i++) {
+				$tmpCheck['write'][$i] = explode("  ", ( ($phpChk) ? $tmpDbObj['write'][$i]->stat() :  ($this->connectObj['config']['mysqlClassType'] == 'mysqli') ? mysqli_stat($tmpDbObj['write'][$i]) : mysql_stat($tmpDbObj['write'][$i]) ));
+				$tmpCheck['write'][$i][7] = explode(": ", $tmpCheck['write'][$i][7]);
+				$tmpCheck['write'][$i]['time'][1] = $i;
+				$tmpCheck['write'][$i]['time'][0] = $tmpCheck['write'][$i][7][1];
+			}
 	
-		for ($i=0; $i<$this->slaveCnt; $i++) {
-			$tmpCheck['read'][$i] = explode("  ", ( ($phpChk) ? $tmpDbObj['read'][$i]->stat() : ($this->connectObj['config']['mysqlClassType'] == 'mysqli') ? mysqli_stat($tmpDbObj['read'][$i]) : mysql_stat($tmpDbObj['read'][$i]) ));
-			$tmpCheck['read'][$i][7] = explode(": ", $tmpCheck['read'][$i][7]);
-			$tmpCheck['read'][$i]['time'][1] = $i;
-			$tmpCheck['read'][$i]['time'][0] = $tmpCheck['read'][$i][7][1];
+			$writeObj = $this->quickSort($tmpCheck['write']);
+	
+			if ($this->slaveCnt == 0) {
+				$readObj = &$writeObj;
+			}  else {
+				$readObj = $this->quickSort($tmpCheck['read']);
+			}
+			
+			$this->objMySQL['read'] = $tmpDbObj['read'][$readObj[0][1]];
+			$this->objMySQL['write'] = $tmpDbObj['write'][$writeObj[0][1]];	
 		}
-		
-		for ($i=0; $i<$this->masterCnt; $i++) {
-			$tmpCheck['write'][$i] = explode("  ", ( ($phpChk) ? $tmpDbObj['write'][$i]->stat() :  ($this->connectObj['config']['mysqlClassType'] == 'mysqli') ? mysqli_stat($tmpDbObj['write'][$i]) : mysql_stat($tmpDbObj['write'][$i]) ));
-			$tmpCheck['write'][$i][7] = explode(": ", $tmpCheck['write'][$i][7]);
-			$tmpCheck['write'][$i]['time'][1] = $i;
-			$tmpCheck['write'][$i]['time'][0] = $tmpCheck['write'][$i][7][1];
-		}
-
-		$writeObj = $this->quickSort($tmpCheck['write']);
-
-		if ($this->slaveCnt == 0) {
-			$readObj = &$writeObj;
-		}  else {
-			$readObj = $this->quickSort($tmpCheck['read']);
-		}
-		
-		$this->objMySQL['read'] = $tmpDbObj['read'][$readObj[0][1]];
-		$this->objMySQL['write'] = $tmpDbObj['write'][$writeObj[0][1]];	
 	}
 
 	/**
@@ -192,6 +202,39 @@ Class MySQLL {
 				break;
 		}
 		
+		$writeCheck = false;
+		$readCheck = false;
+		
+		foreach ($dbObj['write'] as $key => $var) {
+			if (!$dbObj['write'][$key]) {
+				unset($dbObj['write'][$key]);
+			} else {
+				$writeCheck = true;
+			}
+		}
+		
+		foreach ($dbObj['read'] as $key => $var) {
+			if (!$dbObj['read'][$key]) {
+				unset($dbObj['read'][$key]);
+			} else {
+				$readCheck = true;
+			}
+		}
+		
+		$this->masterCnt = count($dbObj['write']);
+		$this->slaveCnt = count($dbObj['read']);
+		
+		if (!$writeCheck && !$readCheck) {
+			return null;
+		} else {
+			if ($writeCheck && !$readCheck) {
+				$dbObj['read'] = &$dbObj['write'];
+			} else {
+				$dbObj['write'] = &$dbObj['read'];
+			}
+		}
+		
+
 		return $dbObj;
 	}
 	
@@ -206,78 +249,78 @@ Class MySQLL {
 	private function connectDb ($config, $dbInfo) {
 		$dbObj = null;
 		
-		switch ($config['mysqlClassType']) {
-			case 'mysql' :
-				if (!$config['connectionPool']) {
-					$dbObj = mysql_connect(
+		try {
+			switch ($config['mysqlClassType']) {
+				case 'mysql' :
+					if (!$config['connectionPool']) {
+						$dbObj = mysql_connect(
+									$dbInfo['host'].':'.$dbInfo['sock'], 
+									$dbInfo['user'], 
+									$dbInfo['pass']
+									) or $this->saveErrorQueryLog($dbInfo['host'], $config['mysqlClassType'].' connect', 'The connection to the server has failed!');
+						
+						mysql_select_db($dbInfo['db'], $dbObj) or die('Data base select failed!');
+						$this->charsetProcess($dbObj, $config['encoding'], 'mysql');
+						
+						break;
+					}
+					
+				case 'mysqlp' :
+					$dbObj = mysql_pconnect(
 								$dbInfo['host'].':'.$dbInfo['sock'], 
 								$dbInfo['user'], 
 								$dbInfo['pass']
-								) or die('The connection to the server has failed!');
-					
+								) or $this->saveErrorQueryLog($dbInfo['host'], $config['mysqlClassType'].' connect', 'The connection to the server has failed!');
+								
 					mysql_select_db($dbInfo['db'], $dbObj) or die('Data base select failed!');
 					$this->charsetProcess($dbObj, $config['encoding'], 'mysql');
 					
 					break;
-				}
-				
-			case 'mysqlp' :
-				$dbObj = mysql_pconnect(
-							$dbInfo['host'].':'.$dbInfo['sock'], 
-							$dbInfo['user'], 
-							$dbInfo['pass']
-							) or die('The connection to the server has failed!');
-							
-				mysql_select_db($dbInfo['db'], $dbObj) or die('Data base select failed!');
-				$this->charsetProcess($dbObj, $config['encoding'], 'mysql');
-				
-				break;
-				
-			case 'mysqli' :
-				if ($config['connectionPool']) {
-					$dbInfo['host'] = 'p:'.$dbInfo['host'];
-				}
-				
-				if ($this->phpVersion[0] >= 5 && $this->phpVersion[1] >= 3) {
-					$dbObj = new mysqli(
-								$dbInfo['host'], 
-								$dbInfo['user'], 
-								$dbInfo['pass'], 
-								$dbInfo['db'], 
-								$dbInfo['port'], 
-								$dbInfo['sock']
-								);
 					
-					if (mysqli_connect_error()) {
-						die('The connection to the server has failed! (' . mysqli_connect_errno() . ') ' . mysqli_connect_error());
+				case 'mysqli' :
+					if ($config['connectionPool']) {
+						$dbInfo['host'] = 'p:'.$dbInfo['host'];
 					}
-				} else {
-					$dbObj = mysqli_connect(
-								$dbInfo['host'], 
-								$dbInfo['user'], 
-								$dbInfo['pass'], 
-								$dbInfo['db'],
-								$dbInfo['port'], 
-								$dbInfo['sock']
-								) or die('The connection to the server has failed!');
 					
-					if ($errorCode = mysqli_connect_errno($dbObj)) {
-						print 'The connection to the server has failed.<br>';
-						print 'error code : '.$errorCode;
-					
-						exit;
+					if ($this->phpVersion[0] >= 5 && $this->phpVersion[1] >= 3) {
+						$dbObj = new mysqli(
+									$dbInfo['host'], 
+									$dbInfo['user'], 
+									$dbInfo['pass'], 
+									$dbInfo['db'], 
+									$dbInfo['port'], 
+									$dbInfo['sock']
+									);
+						
+						if (mysqli_connect_error()) {
+							return $this->saveErrorQueryLog($dbInfo['host'], $config['mysqlClassType'].' connect', 'The connection to the server has failed! (' . mysqli_connect_errno() . ') ' . mysqli_connect_error());
+						}
+					} else {
+						$dbObj = mysqli_connect(
+									$dbInfo['host'], 
+									$dbInfo['user'], 
+									$dbInfo['pass'], 
+									$dbInfo['db'],
+									$dbInfo['port'], 
+									$dbInfo['sock']
+									);
+						
+						if ($errorCode = mysqli_connect_errno($dbObj)) {
+							return $this->saveErrorQueryLog($dbInfo['host'], $config['mysqlClassType'].' connect', 'The connection to the server has failed! ('.$errorCode.')');
+						}
 					}
-				}
-				
-				$this->charsetProcess($dbObj, $config['encoding'], 'mysqli');
-				break;
+					
+					$this->charsetProcess($dbObj, $config['encoding'], 'mysqli');
+					break;
+			}
+		} catch (Exception $e) {
+			return null;
 		}
 		
 		if ($dbObj) {
 			return $dbObj;
 		} else {
-			print 'The connection to the server has failed.<br>';		
-			exit;
+			return $this->saveErrorQueryLog($dbInfo['host'], $config['mysqlClassType'].' connect', 'The connection to the server has failed!');
 		}
 	}
 	
@@ -289,11 +332,15 @@ Class MySQLL {
 	 * @return void
 	 */
 	public function selectDb ($dbName) {
+		if (!$this->objMySQL['read'] || !$this->objMySQL['write']) {
+			return $this->saveErrorQueryLog('all DB', 'select db', 'Data Object is null');;
+		}
+		
 		switch ($this->connectObj['config']['mysqlClassType']) {
 			case 'mysql' :
 			case 'mysqlp' :
-				mysql_select_db($dbName, $this->objMySQL['read']) or die('Data base select failed!');
-				mysql_select_db($dbName, $this->objMySQL['write']) or die('Data base select failed!');
+				mysql_select_db($dbName, $this->objMySQL['read']) or $this->saveErrorQueryLog($this->objMySQL['read']['host'], 'select db', 'Data base select failed!');
+				mysql_select_db($dbName, $this->objMySQL['write']) or $this->saveErrorQueryLog($this->objMySQL['write']['host'], 'select db', 'Data base select failed!');
 				break;
 		
 			case 'mysqli' :
@@ -497,6 +544,10 @@ Class MySQLL {
      * @return result set
      */
 	private function resultReturn ($sql, $dbObj) {
+		if (!$dbObj) {
+			return Array('dbConnectError' => 'The connection to the server has failed!');
+		}
+		
 		if ($this->connectObj['config']['queryDebug']) {
 			$queryTime = explode(' ', microtime());
 			$queryTime = $queryTime[0] + $queryTime[1];
@@ -547,6 +598,10 @@ Class MySQLL {
 		$sql = 'select ' . $colums . ' from ' . $table . ' ' . $where . ' ' . $group . ' ' . $order . ' ' . $etcoptions;
 	
 		$result = $this->resultReturn($sql, $this->objMySQL['read']);
+		
+		if (is_array($result) && array_key_exists('dbConnectError', $result)) {
+			return $result;
+		}
 		
 		if (!$result) {
 			return $this->dbReturn_MySQLError(false, $this->objMySQL['read']);
@@ -604,6 +659,10 @@ Class MySQLL {
 		if ($output) {
 			$result = $this->resultReturn($sql, $this->objMySQL['read']);
 	
+			if (is_array($result) && array_key_exists('dbConnectError', $result)) {
+				return $result;
+			}
+			
 			if (!is_a($result, $this->connectObj['config']['mysqlClassType'].'_result') || $this->dbReturn_MySQLError(false, $this->objMySQL['read'])) {
 				return $this->dbReturn_MySQLError(false, $this->objMySQL['read']);
 			}
@@ -633,6 +692,10 @@ Class MySQLL {
 	
 				$sql    = 'SELECT ' . $outResult;
 				$result =  $this->resultReturn($sql, $this->objMySQL['read']);
+				
+				if (is_array($result) && array_key_exists('dbConnectError', $result)) {
+					return $result;
+				}
 				
 				if (!is_a($result, $this->connectObj['config']['mysqlClassType'].'_result') || $this->dbReturn_MySQLError(false, $this->objMySQL['read'])) {
 					return $this->dbReturn_MySQLError(false, $this->objMySQL['read']);
@@ -682,6 +745,10 @@ Class MySQLL {
 
         $result = $this->resultReturn($sql, $this->objMySQL['read']);
 
+        if (is_array($result) && array_key_exists('dbConnectError', $result)) {
+        	return $result;
+        }
+        
 		if (!$result) {
 			return $this->dbReturn_MySQLError(false, $this->objMySQL['read']);
 		}
@@ -707,6 +774,10 @@ Class MySQLL {
 
         $result = $this->resultReturn($sql, $this->objMySQL['read']);
         
+        if (is_array($result) && array_key_exists('dbConnectError', $result)) {
+        	return $result;
+        }
+        
 		if (!$result) {
 			return $this->dbReturn_MySQLError(false, $this->objMySQL['read']);
 		}
@@ -729,7 +800,11 @@ Class MySQLL {
 
 		$actDb = ($this->connectObj['config']['composition'] == 's') ? $this->objMySQL['read'] : $this->objMySQL['write'];
 
-		$this->resultReturn($sql, $actDb);
+		$result = $this->resultReturn($sql, $actDb);
+		
+		if (is_array($result) && array_key_exists('dbConnectError', $result)) {
+			return $result;
+		}
 		
 		return $this->dbReturn_InsertId($actDb);
     }
@@ -783,13 +858,17 @@ Class MySQLL {
     	if (is_array($fields) && is_array($dataTypes) && is_array($dataSizes)) {
     		$createTable = Array();
     		
+    		$dataSizeNone = Array('timestamp', 'text');
     		
     		foreach ($fields as $key => $var) {
     			if (!$fields[$key] ||  $fields[$key] == '') {
     				continue;
     			}
     			
-    			$creataTable[] = $fields[$key].' '.$dataTypes[$key]. (($dataTypes[$key] == 'timestamp') ? ' ' : '('.$dataSizes[$key].')') . (($var == 'id') ? ' NOT NULL AUTO_INCREMENT PRIMARY KEY' : ' NULL');
+    			$fields[$key] = trim($fields[$key]);
+    			$dataTypes[$key] = trim($dataTypes[$key]);
+    			
+    			$creataTable[] = $fields[$key].' '.$dataTypes[$key]. (in_array($dataTypes[$key], $dataSizeNone) ? ' ' : '('.$dataSizes[$key].')') . (($fields[$key] == 'id') ? ' NOT NULL AUTO_INCREMENT PRIMARY KEY' : (($dataTypes[$key] != 'enum') ? ' NULL' : ' '));
     		}
     		
     		if (count($creataTable) > 0) {
@@ -798,6 +877,8 @@ Class MySQLL {
     		
     		$actDb = ($this->connectObj['config']['composition'] == 's') ? $this->objMySQL['read'] : $this->objMySQL['write'];
 
+    		unset($dataSizeNone);
+    		
         	return $this->resultReturn($creataTable, $actDb);
     	}
     	
@@ -877,6 +958,10 @@ Class MySQLL {
 
         $result = $this->resultReturn($sql, $this->objMySQL['read']);
         
+        if (is_array($result) && array_key_exists('dbConnectError', $result)) {
+        	return $result;
+        }
+        
         if (!$result) {
         	return $this->dbReturn_MySQLError(false, $this->objMySQL['read']);
         }
@@ -898,17 +983,34 @@ Class MySQLL {
 
         $result = $this->resultReturn($sql, $this->objMySQL['read']);
         
+        if (is_array($result) && array_key_exists('dbConnectError', $result)) {
+        	return $result;
+        }
+        
    	 	if (!$result) {
-        	$this->dbReturn_MySQLError(true, $this->objMySQL['read']);
+        	return $this->dbReturn_MySQLError(true, $this->objMySQL['read']);
         }
     }
 
+    /**
+     * lock table
+     *
+     * @param String $table table name
+     * @param String $types lock type
+     * @param String $option option
+     *
+     * @return void
+     */
 	function lockTable ($table, $types, $option) {
 		$sql = $types." TABLE ".$table.' '.$option;
 
 		$actDb = ($this->connectObj['config']['composition'] == 's') ? $this->objMySQL['read'] : $this->objMySQL['write'];
 
         $result = $this->resultReturn($sql, $actDb);
+        
+        if (is_array($result) && array_key_exists('dbConnectError', $result)) {
+        	return $result;
+        }
         
 		if (!$result) {
         	return $this->dbReturn_MySQLError(false, $actDb);
@@ -932,7 +1034,27 @@ Class MySQLL {
     	} else {
     		return $this->queryLog;
     	}
-		
+    }
+    
+    /**
+     * save error query log
+     *
+     * @param string $server db serverInfo
+     * @param string $type query type
+     * @param string $query query string
+     *
+     * @return boolean
+     */
+    private function saveErrorQueryLog ($server, $type, $query) {
+    	$fp = fopen($this->queryErrorLogPath.'error_query_log_'.date('Ymd').'.log', 'a');
+    	$logMessage = $server. ' : ('.$type.') '. $query."\r\n";
+    	fwrite($fp, $logMessage);
+    	fclose($fp);
+    	
+    	unset($logMessage);
+    	unset($fp);
+    	
+    	return false;
     }
 
     /**
@@ -948,14 +1070,34 @@ Class MySQLL {
     	$chekLength = 0;
     	 
         if ($this->connectObj['config']['mysqlClassType'] == 'mysqli') {
-        	mysqli_close($this->objMySQL['read']);
-        	$chekLength = @strlen($this->objMySQL['write']->host_info);
-        	if ($this->connectObj['config']['composition'] != 's' && ($chekLength > 0)) { mysqli_close($this->objMySQL['write']); }
+        	if ($this->objMySQL['read']) {
+        		mysqli_close($this->objMySQL['read']);
+        	}
+        	
+        	if ($this->objMySQL['write']) {
+        		try {
+        			$chekLength = strlen($this->objMySQL['write']->host_info);
+        		} catch (Exception $e) {
+        			$chekLength = 0;
+        		}
+        		
+        		if ($this->connectObj['config']['composition'] != 's' && ($chekLength > 0)) { mysqli_close($this->objMySQL['write']); }
+        	}
         }
         else {
-        	mysql_close($this->objMySQL['read']);
-        	$chekLength = @strlen($this->objMySQL['write']->host_info);
-        	if ($this->connectObj['config']['composition'] != 's' && ($chekLength > 0)) { mysql_close($this->objMySQL['write']); }
+        	if ($this->objMySQL['read']) {
+        		mysqli_close($this->objMySQL['read']);
+        	}
+        	
+        	if ($this->objMySQL['write']) {
+        		try {
+        			$chekLength = strlen($this->objMySQL['write']->host_info);
+        		} catch (Exception $e) {
+        			$chekLength = 0;
+        		}
+        		
+        		if ($this->connectObj['config']['composition'] != 's' && ($chekLength > 0)) { mysql_close($this->objMySQL['write']); }
+        	}
         }
     }
 }
