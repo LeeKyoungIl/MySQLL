@@ -1,8 +1,5 @@
 <?php
 
-//error handler
-set_error_handler(create_function('$p1, $p2, $p3, $p4', 'throw new ErrorException($p2, 0, $p1, $p3, $p4);'), E_ALL);
-
 /**
 * ● author - LeeKyoungIl / leekyoungil@gmail.com
 * ● blog - http://blog.leekyoungil.com 
@@ -12,7 +9,7 @@ set_error_handler(create_function('$p1, $p2, $p3, $p4', 'throw new ErrorExceptio
 *                       
 * ● requires PHP 5.3.x and either MySQL 5.x                                                                              
 *
-* ● version - 0.9 (2013/08/19)
+* ● version - 1.0 (2013/08/19)
 * 
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -28,6 +25,9 @@ set_error_handler(create_function('$p1, $p2, $p3, $p4', 'throw new ErrorExceptio
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 * 
 */
+
+//error handler
+set_error_handler(create_function('$p1, $p2, $p3, $p4', 'throw new ErrorException($p2, 0, $p1, $p3, $p4);'), E_ALL);
 
 Class MySQLL {
 	private $connectObj = Array();
@@ -132,9 +132,15 @@ Class MySQLL {
 			}  else {
 				$readObj = $this->quickSort($tmpCheck['read']);
 			}
+
+			unset($tmpCheck);
 			
 			$this->objMySQL['read'] = $tmpDbObj['read'][$readObj[0][1]];
 			$this->objMySQL['write'] = $tmpDbObj['write'][$writeObj[0][1]];	
+
+			unset($writeObj);
+			unset($readObj);
+			unset($tmpDbObj);
 		}
 	}
 
@@ -196,9 +202,6 @@ Class MySQLL {
 						$dbObj['read'][$i] = &$dbObj['write'][$i];
 					}
 				}
-				
-				$this->slaveCnt = $this->masterCnt;
-				
 				break;
 		}
 		
@@ -234,7 +237,6 @@ Class MySQLL {
 			}
 		}
 		
-
 		return $dbObj;
 	}
 	
@@ -259,7 +261,7 @@ Class MySQLL {
 									$dbInfo['pass']
 									) or $this->saveErrorQueryLog($dbInfo['host'], $config['mysqlClassType'].' connect', 'The connection to the server has failed!');
 						
-						mysql_select_db($dbInfo['db'], $dbObj) or die('Data base select failed!');
+						mysql_select_db($dbInfo['db'], $dbObj) or $this->saveErrorQueryLog($dbInfo['host'], $config['mysqlClassType'].' connect', 'Data base select failed!');
 						$this->charsetProcess($dbObj, $config['encoding'], 'mysql');
 						
 						break;
@@ -272,7 +274,7 @@ Class MySQLL {
 								$dbInfo['pass']
 								) or $this->saveErrorQueryLog($dbInfo['host'], $config['mysqlClassType'].' connect', 'The connection to the server has failed!');
 								
-					mysql_select_db($dbInfo['db'], $dbObj) or die('Data base select failed!');
+					mysql_select_db($dbInfo['db'], $dbObj) or $this->saveErrorQueryLog($dbInfo['host'], $config['mysqlClassType'].' connect', 'Data base select failed!');
 					$this->charsetProcess($dbObj, $config['encoding'], 'mysql');
 					
 					break;
@@ -403,6 +405,8 @@ Class MySQLL {
 				}
 			}
 		}
+
+		unset($methodType);
 	}
 	
 	/**
@@ -553,6 +557,8 @@ Class MySQLL {
 			$queryTime = $queryTime[0] + $queryTime[1];
 	
 			$this->startTime = $queryTime;
+
+			unset($queryTime);
 		}
 	
 		$result = null;
@@ -565,12 +571,17 @@ Class MySQLL {
 			$queryTime = $queryTime[0] + $queryTime[1];
 	
 			$this->endTime = $queryTime;
+
+			unset($queryTime);
 	
 			$timeName = explode(' ', $sql);
 			$timeName = trim($timeName[0]);
 			
 			$serverName = ($dbObj != null && is_a($dbObj, $this->connectObj['config']['mysqlClassType']) && property_exists($this->connectObj['config']['mysqlClassType'], 'host_info')) ? $dbObj->host_info.' : ' : '';
 			$this->queryLog[] = $serverName.$timeName." : (".substr($this->endTime-$this->startTime, 0, 6)." sec) ".$sql;
+
+			unset($timeName);
+			unset($serverName);
 		}
 	
 		return $result;
@@ -597,7 +608,13 @@ Class MySQLL {
 	
 		$sql = 'select ' . $colums . ' from ' . $table . ' ' . $where . ' ' . $group . ' ' . $order . ' ' . $etcoptions;
 	
+		unset($where);
+		unset($group);
+		unset($order);
+
 		$result = $this->resultReturn($sql, $this->objMySQL['read']);
+
+		unset($sql);
 		
 		if (is_array($result) && array_key_exists('dbConnectError', $result)) {
 			return $result;
@@ -608,7 +625,8 @@ Class MySQLL {
 		}
 
 		$returnRows = null;	
-		
+		$rows = null;
+
 		if ($multiple == false) {
 			switch ($type) {
 				case 'Assoc' : $rows = $this->dbReturn_fetchAssoc($result); break;
@@ -616,9 +634,9 @@ Class MySQLL {
 				case 'Rows'  : $rows = $this->dbReturn_numRows($result);    break;
 				default      : $rows = $this->dbReturn_fetchAssoc($result); break;
 			}
+
 			$returnRows = $rows;
-		}
-		else {
+		} else {
 			$returnRows = Array();
 			
 			switch ($type) {
@@ -627,6 +645,8 @@ Class MySQLL {
 				default      : while ($rows = $this->dbReturn_fetchAssoc($result)) $returnRows[] = $rows; break;
 			}
 		}
+
+		unset($rows);
 	
 		return $returnRows;
 	}
@@ -648,8 +668,7 @@ Class MySQLL {
 		if (is_array($vars)) {
 			$vars = implode(', ', $vars);
 			$sql  = 'call ' . $spName . '('.$vars.')';
-		}
-		else {
+		} else {
 			if ($vars == null) { $sql = 'call ' . $spName . '()'; }
 			else { $sql = 'call ' . $spName . '('.$vars.')'; }
 		}
@@ -658,6 +677,8 @@ Class MySQLL {
 		
 		if ($output) {
 			$result = $this->resultReturn($sql, $this->objMySQL['read']);
+
+			unset($sql);
 	
 			if (is_array($result) && array_key_exists('dbConnectError', $result)) {
 				return $result;
@@ -666,6 +687,9 @@ Class MySQLL {
 			if (!is_a($result, $this->connectObj['config']['mysqlClassType'].'_result') || $this->dbReturn_MySQLError(false, $this->objMySQL['read'])) {
 				return $this->dbReturn_MySQLError(false, $this->objMySQL['read']);
 			}
+
+			$returnRows = null;
+			$rows = null;
 
 			if (!$multiple) {
 				switch ($type) {
@@ -676,22 +700,25 @@ Class MySQLL {
 				}
 	
 				$returnRows = $rows;
-			}
-			else {
+			} else {
+				$returnRows = Array();
+
 				switch ($type) {
 					case 'Assoc' : while ($rows = $this->dbReturn_fetchAssoc($result)) $returnRows[] = $rows; break;
 					case 'Field' : while ($rows = $this->dbReturn_fetchField($result)) $returnRows[] = $rows; break;
 					default      : while ($rows = $this->dbReturn_fetchAssoc($result)) $returnRows[] = $rows; break;
 				}
 			}
+
+			unset($rows);
 	
 			$this->dbReturn_NextResult($this->objMySQL['read']);
 	
 			if ($outResult != null) {
-				unset($rows);
-	
 				$sql    = 'SELECT ' . $outResult;
 				$result =  $this->resultReturn($sql, $this->objMySQL['read']);
+
+				unset($sql);
 				
 				if (is_array($result) && array_key_exists('dbConnectError', $result)) {
 					return $result;
@@ -700,13 +727,8 @@ Class MySQLL {
 				if (!is_a($result, $this->connectObj['config']['mysqlClassType'].'_result') || $this->dbReturn_MySQLError(false, $this->objMySQL['read'])) {
 					return $this->dbReturn_MySQLError(false, $this->objMySQL['read']);
 				}
-	
-				switch ($type) {
-					case 'Assoc' : $rows = $this->dbReturn_fetchAssoc($result); break;
-					case 'Field' : $rows = $this->dbReturn_fetchField($result); break;
-					case 'Rows'  : $rows = $this->dbReturn_numRows($result);    break;
-					default      : $rows = $this->dbReturn_fetchAssoc($result); break;
-				}
+
+				unset($result);
 	
 				$this->dbReturn_NextResult($this->objMySQL['read']);
 			}
@@ -715,6 +737,9 @@ Class MySQLL {
 		} else {
 			if ($this->connectObj['config']['composition'] == 's') {
 				$result = $this->resultReturn($this->objMySQL['read']);
+
+				unset($result);
+
 				$this->dbReturn_NextResult($this->objMySQL['read']);
 			}
 			else {
@@ -722,6 +747,9 @@ Class MySQLL {
 	
 				$result = $this->resultReturn($sql, $actDb);
 				$this->dbReturn_NextResult($actDb);
+
+				unset($sql);
+				unset($actDb);
 			}
 	
 			return $result;
@@ -743,7 +771,12 @@ Class MySQLL {
         $group = ($group) ? ' group by ' . $group : Null;
         $sql   = 'select count('. $coloum .') from ' . $table . ' '. $where . $group;
 
+        unset($where);
+        unset($group);
+
         $result = $this->resultReturn($sql, $this->objMySQL['read']);
+
+        unset($sql);
 
         if (is_array($result) && array_key_exists('dbConnectError', $result)) {
         	return $result;
@@ -753,7 +786,10 @@ Class MySQLL {
 			return $this->dbReturn_MySQLError(false, $this->objMySQL['read']);
 		}
 
-        if ($group)  { while($row = $this->dbReturn_fetchRow($result)) { $returnRows[] = $row; } }
+		$returnRows = null;
+		$row = null;
+
+        if ($group)  { $returnRows = Array(); while($row = $this->dbReturn_fetchRow($result)) { $returnRows[] = $row; } }
         else { $row = $this->dbReturn_fetchRow($result); }
 
         return ($group) ? count($returnRows) : $row['0'];
@@ -772,7 +808,11 @@ Class MySQLL {
         $where = ($where) ? ' where ' . $where : Null;
         $sql = 'select max('. $coloum .') from ' . $table . ' '. $where;
 
+        unset($where);
+
         $result = $this->resultReturn($sql, $this->objMySQL['read']);
+
+        unset($sql);
         
         if (is_array($result) && array_key_exists('dbConnectError', $result)) {
         	return $result;
@@ -801,6 +841,9 @@ Class MySQLL {
 		$actDb = ($this->connectObj['config']['composition'] == 's') ? $this->objMySQL['read'] : $this->objMySQL['write'];
 
 		$result = $this->resultReturn($sql, $actDb);
+
+		unset($sql);
+		unset($actDb);
 		
 		if (is_array($result) && array_key_exists('dbConnectError', $result)) {
 			return $result;
@@ -819,11 +862,7 @@ Class MySQLL {
      * @return int
      */
     function update ($table, $values, $where) {
-        $sql = 'update ' . $table . ' set ' . $values . ' where ' . $where;
-        
-        $actDb = ($this->connectObj['config']['composition'] == 's') ? $this->objMySQL['read'] : $this->objMySQL['write'];
-
-        return $this->resultReturn($sql, $actDb);
+        return $this->resultReturn('update ' . $table . ' set ' . $values . ' where ' . $where, (($this->connectObj['config']['composition'] == 's') ? $this->objMySQL['read'] : $this->objMySQL['write']));
     }
 
     /**
@@ -837,11 +876,7 @@ Class MySQLL {
     function delete ($table, $where) {
         if ($where != null) { $where = ' where ' . $where; }
 
-        $sql = 'delete from ' . $table . $where;
-
-        $actDb = ($this->connectObj['config']['composition'] == 's') ? $this->objMySQL['read'] : $this->objMySQL['write'];
-
-        return $this->resultReturn($sql, $actDb);
+        return $this->resultReturn('delete from ' . $table . $where, (($this->connectObj['config']['composition'] == 's') ? $this->objMySQL['read'] : $this->objMySQL['write']));
     }
     
     /**
@@ -849,8 +884,8 @@ Class MySQLL {
      *
      * @param String $tableName table name
      * @param Array $fields
-     * * @param Array $dataTypes
-     * * @param Array $dataSizes
+     * @param Array $dataTypes
+     * @param Array $dataSizes
      *
      * @return int or boolean
      */
@@ -891,8 +926,8 @@ Class MySQLL {
      * @param String $type alter type
      * @param String $tableName table name
      * @param Array $fields
-     * * @param Array $dataTypes
-     * * @param Array $dataSizes
+     * @param Array $dataTypes
+     * @param Array $dataSizes
      *
      * @return int or boolean
      */
@@ -954,9 +989,7 @@ Class MySQLL {
      * @return result set
      */
     function tableStatus ($table) {
-        $sql = "SHOW TABLE STATUS LIKE '" . $table . "'";
-
-        $result = $this->resultReturn($sql, $this->objMySQL['read']);
+        $result = $this->resultReturn("SHOW TABLE STATUS LIKE '" . $table . "'", $this->objMySQL['read']);
         
         if (is_array($result) && array_key_exists('dbConnectError', $result)) {
         	return $result;
@@ -966,7 +999,10 @@ Class MySQLL {
         	return $this->dbReturn_MySQLError(false, $this->objMySQL['read']);
         }
 
-        while($rows = $this->dbReturn_fetchAssoc($result)) { $returnRows[] = $rows; }
+        $returnRows = Array();
+        $rows = null;
+
+        while($rows = $this->dbReturn_fetchAssoc($result)) { $returnRows[] = $rows; unset($rows); }
 
         return $returnRows;
     }
@@ -979,9 +1015,7 @@ Class MySQLL {
      * @return void
      */
     function optimizerTable ($table) {
-        $sql = "OPTIMIZE TABLE '" . $table . "'";
-
-        $result = $this->resultReturn($sql, $this->objMySQL['read']);
+        $result = $this->resultReturn("OPTIMIZE TABLE '" . $table . "'", $this->objMySQL['read']);
         
         if (is_array($result) && array_key_exists('dbConnectError', $result)) {
         	return $result;
@@ -1002,11 +1036,9 @@ Class MySQLL {
      * @return void
      */
 	function lockTable ($table, $types, $option) {
-		$sql = $types." TABLE ".$table.' '.$option;
-
 		$actDb = ($this->connectObj['config']['composition'] == 's') ? $this->objMySQL['read'] : $this->objMySQL['write'];
 
-        $result = $this->resultReturn($sql, $actDb);
+        $result = $this->resultReturn($types." TABLE ".$table.' '.$option, $actDb);
         
         if (is_array($result) && array_key_exists('dbConnectError', $result)) {
         	return $result;
@@ -1015,6 +1047,8 @@ Class MySQLL {
 		if (!$result) {
         	return $this->dbReturn_MySQLError(false, $actDb);
         }
+
+        unset($actDb);
         
         return $result;
 	}
