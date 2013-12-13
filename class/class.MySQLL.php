@@ -9,7 +9,7 @@
 *                       
 * ● requires PHP 5.3.x and either MySQL 5.x                                                                              
 *
-* ● version - 1.0 (2013/08/19)
+* ● version - 1.5 (2013/12/13)
 * 
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -41,7 +41,7 @@ Class MySQLL {
 	private $queryLog = Array();
 	
 	private $phpVersion = null;
-	private $queryErrorLogPath = 'your log path';
+	private $queryErrorLogPath = 'your log path /query_log/';
 	
 	/**
      * Construct Class
@@ -53,7 +53,7 @@ Class MySQLL {
      */
 	public function __construct () {
 		#-> DB config
-		require_once $_SERVER['DOCUMENT_ROOT'] . 'DataCloud/Db/MySQLL/config/setup.MySQLL.php';	
+		require_once '/MySQLL/config/setup.MySQLL.php';	
 	
 		$this->phpVersion = explode('.', phpversion());
 		
@@ -111,19 +111,24 @@ Class MySQLL {
 			
 			$phpChk = ( ($this->connectObj['config']['mysqlClassType'] == 'mysqli' && $this->phpVersion[0] >= 5 && $this->phpVersion[1] >= 3) ? true : false );
 		
-			for ($i=0; $i<$this->slaveCnt; $i++) {
-				$tmpCheck['read'][$i] = explode("  ", ( ($phpChk) ? $tmpDbObj['read'][$i]->stat() : ($this->connectObj['config']['mysqlClassType'] == 'mysqli') ? mysqli_stat($tmpDbObj['read'][$i]) : mysql_stat($tmpDbObj['read'][$i]) ));
-				$tmpCheck['read'][$i][7] = explode(": ", $tmpCheck['read'][$i][7]);
-				$tmpCheck['read'][$i]['time'][1] = $i;
-				$tmpCheck['read'][$i]['time'][0] = $tmpCheck['read'][$i][7][1];
+			$actArray = Array('read', 'write');
+			
+			$actArrayCnt = Array();
+			$actArrayCnt['read'] = $this->slaveCnt;
+			$actArrayCnt['write'] = $this->masterCnt;
+			
+			for ($k=0; $k<count($actArray); $k++) {
+				for ($i=0; $i<$actArrayCnt[$actArray[$k]]; $i++) {
+					$tmpCheck[$actArray[$k]][$i] = explode("  ", ( ($phpChk) ? $tmpDbObj[$actArray[$k]][$i]->stat() : ($this->connectObj['config']['mysqlClassType'] == 'mysqli') ? mysqli_stat($tmpDbObj[$actArray[$k]][$i]) : mysql_stat($tmpDbObj[$actArray[$k]][$i]) ));
+					$tmpCheck[$actArray[$k]][$i][7] = explode(": ", $tmpCheck[$actArray[$k]][$i][7]);
+					$tmpCheck[$actArray[$k]][$i]['time'][1] = $i;
+					$tmpCheck[$actArray[$k]][$i]['time'][0] = $tmpCheck[$actArray[$k]][$i][7][1];
+				}
 			}
 			
-			for ($i=0; $i<$this->masterCnt; $i++) {
-				$tmpCheck['write'][$i] = explode("  ", ( ($phpChk) ? $tmpDbObj['write'][$i]->stat() :  ($this->connectObj['config']['mysqlClassType'] == 'mysqli') ? mysqli_stat($tmpDbObj['write'][$i]) : mysql_stat($tmpDbObj['write'][$i]) ));
-				$tmpCheck['write'][$i][7] = explode(": ", $tmpCheck['write'][$i][7]);
-				$tmpCheck['write'][$i]['time'][1] = $i;
-				$tmpCheck['write'][$i]['time'][0] = $tmpCheck['write'][$i][7][1];
-			}
+			unset($actArrayCnt);
+			
+			unset($actArray);
 	
 			$writeObj = $this->quickSort($tmpCheck['write']);
 	
@@ -232,7 +237,7 @@ Class MySQLL {
 		} else {
 			if ($writeCheck && !$readCheck) {
 				$dbObj['read'] = &$dbObj['write'];
-			} else {
+			} else if (!$writeCheck && $readCheck) {
 				$dbObj['write'] = &$dbObj['read'];
 			}
 		}
@@ -664,7 +669,9 @@ Class MySQLL {
      *
      * @return result row
      */
-	function callStoredProc ($spName, $type=null, $vars=null, $multiple=false, $output=false, $outResult=null, $input=false) {
+	function callStoredProc ($spName, $type=null, $vars=null, $multiple=false, $output=false, $outResult=null, $input=false, $select=false) {
+		$runDbObj = (($select == true) ? $this->objMySQL['read'] : $this->objMySQL['write']);
+		//print_r($runDbObj);
 		if (is_array($vars)) {
 			$vars = implode(', ', $vars);
 			$sql  = 'call ' . $spName . '('.$vars.')';
@@ -676,7 +683,7 @@ Class MySQLL {
 		$returnRows = null;
 		
 		if ($output) {
-			$result = $this->resultReturn($sql, $this->objMySQL['read']);
+			$result = $this->resultReturn($sql, $runDbObj);
 
 			unset($sql);
 	
@@ -684,8 +691,8 @@ Class MySQLL {
 				return $result;
 			}
 			
-			if (!is_a($result, $this->connectObj['config']['mysqlClassType'].'_result') || $this->dbReturn_MySQLError(false, $this->objMySQL['read'])) {
-				return $this->dbReturn_MySQLError(false, $this->objMySQL['read']);
+			if (!is_a($result, $this->connectObj['config']['mysqlClassType'].'_result') || $this->dbReturn_MySQLError(false, $runDbObj)) {
+				return $this->dbReturn_MySQLError(false, $runDbObj);
 			}
 
 			$returnRows = null;
@@ -712,11 +719,11 @@ Class MySQLL {
 
 			unset($rows);
 	
-			$this->dbReturn_NextResult($this->objMySQL['read']);
+			$this->dbReturn_NextResult($runDbObj);
 	
 			if ($outResult != null) {
 				$sql    = 'SELECT ' . $outResult;
-				$result =  $this->resultReturn($sql, $this->objMySQL['read']);
+				$result =  $this->resultReturn($sql, $runDbObj);
 
 				unset($sql);
 				
@@ -724,13 +731,13 @@ Class MySQLL {
 					return $result;
 				}
 				
-				if (!is_a($result, $this->connectObj['config']['mysqlClassType'].'_result') || $this->dbReturn_MySQLError(false, $this->objMySQL['read'])) {
-					return $this->dbReturn_MySQLError(false, $this->objMySQL['read']);
+				if (!is_a($result, $this->connectObj['config']['mysqlClassType'].'_result') || $this->dbReturn_MySQLError(false, $runDbObj)) {
+					return $this->dbReturn_MySQLError(false, $runDbObj);
 				}
 
 				unset($result);
 	
-				$this->dbReturn_NextResult($this->objMySQL['read']);
+				$this->dbReturn_NextResult($runDbObj);
 			}
 	
 			return $returnRows;
@@ -843,7 +850,6 @@ Class MySQLL {
 		$result = $this->resultReturn($sql, $actDb);
 
 		unset($sql);
-		unset($actDb);
 		
 		if (is_array($result) && array_key_exists('dbConnectError', $result)) {
 			return $result;
