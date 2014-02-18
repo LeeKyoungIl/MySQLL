@@ -53,7 +53,7 @@ Class MySQLL {
      */
 	public function __construct () {
 		#-> DB config
-		require_once '/home/cloud-data-repository/php_basic_include/MySQLL/config/setup.MySQLL.php';	
+		require_once '../config/setup.MySQLL.php';	
 	
 		$this->phpVersion = explode('.', phpversion());
 		
