@@ -9,7 +9,7 @@
 *                       
 * ● requires PHP 5.3.x and either MySQL 5.x                                                                              
 *
-* ● version - 1.5 (2013/12/13)
+* ● version - 1.6 (2014/2/18)
 * 
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -41,7 +41,7 @@ Class MySQLL {
 	private $queryLog = Array();
 	
 	private $phpVersion = null;
-	private $queryErrorLogPath = 'your log path /query_log/';
+	private $queryErrorLogPath = 'your log path';
 	
 	/**
      * Construct Class
@@ -53,7 +53,7 @@ Class MySQLL {
      */
 	public function __construct () {
 		#-> DB config
-		require_once '/MySQLL/config/setup.MySQLL.php';	
+		require_once '/home/cloud-data-repository/php_basic_include/MySQLL/config/setup.MySQLL.php';	
 	
 		$this->phpVersion = explode('.', phpversion());
 		
@@ -568,7 +568,7 @@ Class MySQLL {
 	
 		$result = null;
 	
-		if ($this->connectObj['config']['mysqlClassType'] == 'mysqli') { $result = mysqli_query($dbObj, $sql); }
+		if ($this->connectObj['config']['mysqlClassType'] == 'mysqli') { $result = ($this->phpVersion[0] >= 5 && $this->phpVersion[1] >= 3) ? $dbObj->query($sql) : mysqli_query($dbObj, $sql); }
 		else { $result = mysql_query($sql, $dbObj); }
 	
 		if ($this->connectObj['config']['queryDebug']) {
@@ -899,7 +899,7 @@ Class MySQLL {
     	if (is_array($fields) && is_array($dataTypes) && is_array($dataSizes)) {
     		$createTable = Array();
     		
-    		$dataSizeNone = Array('timestamp', 'text');
+    		$dataSizeNone = Array('timestamp', 'text', 'float', 'double');
     		
     		foreach ($fields as $key => $var) {
     			if (!$fields[$key] ||  $fields[$key] == '') {
@@ -913,7 +913,7 @@ Class MySQLL {
     		}
     		
     		if (count($creataTable) > 0) {
-    			$creataTable = 'CREATE TABLE ' .$tableName. '(' . implode(',', $creataTable) . ') ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;';
+    			$creataTable = 'CREATE TABLE ' .$tableName. '(' . implode(',', $creataTable) . ') ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;';
     		}
     		
     		$actDb = ($this->connectObj['config']['composition'] == 's') ? $this->objMySQL['read'] : $this->objMySQL['write'];
@@ -1111,7 +1111,11 @@ Class MySQLL {
     	 
         if ($this->connectObj['config']['mysqlClassType'] == 'mysqli') {
         	if ($this->objMySQL['read']) {
-        		mysqli_close($this->objMySQL['read']);
+        		if ($this->phpVersion[0] >= 5 && $this->phpVersion[1] >= 3) {
+        			$this->objMySQL['read']->close();
+        		} else {
+        			mysqli_close($this->objMySQL['read']);
+        		}
         	}
         	
         	if ($this->objMySQL['write']) {
@@ -1121,12 +1125,17 @@ Class MySQLL {
         			$chekLength = 0;
         		}
         		
-        		if ($this->connectObj['config']['composition'] != 's' && ($chekLength > 0)) { mysqli_close($this->objMySQL['write']); }
+        		if ($this->connectObj['config']['composition'] != 's' && ($chekLength > 0)) { 
+        			if ($this->phpVersion[0] >= 5 && $this->phpVersion[1] >= 3) {
+        				$this->objMySQL['write']->close();
+        			} else {
+        				mysqli_close($this->objMySQL['write']);
+        			}
+        		}
         	}
-        }
-        else {
+        } else {
         	if ($this->objMySQL['read']) {
-        		mysqli_close($this->objMySQL['read']);
+        		mysql_close($this->objMySQL['read']);
         	}
         	
         	if ($this->objMySQL['write']) {
