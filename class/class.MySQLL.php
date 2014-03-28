@@ -9,7 +9,7 @@
 *                       
 * ● requires PHP 5.3.x and either MySQL 5.x                                                                              
 *
-* ● version - 1.6 (2014/2/18)
+* ● version - 1.7 (2014/03/28)
 * 
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -41,7 +41,7 @@ Class MySQLL {
 	private $queryLog = Array();
 	
 	private $phpVersion = null;
-	private $queryErrorLogPath = 'your log path';
+	private $queryErrorLogPath = '/home/cloud-data-repository/query_log/';
 	
 	/**
      * Construct Class
@@ -53,7 +53,7 @@ Class MySQLL {
      */
 	public function __construct () {
 		#-> DB config
-		require_once '../config/setup.MySQLL.php';	
+		require_once '/home/cloud-data-repository/php_basic_include/MySQLL/config/setup.MySQLL.php';	
 	
 		$this->phpVersion = explode('.', phpversion());
 		
@@ -948,15 +948,15 @@ Class MySQLL {
     			break;
     			
     		case 'CHANGE' :
-    			if ($tableName && is_array($fieldName) && $dataType && $dataSize) {
-    				return $this->resultReturn('ALTER TABLE '.$tableName.' '.$type.' '.$fieldName['old'].' '.$fieldName['new'].' '.$dataType.'('.$dataSize.');', $actDb);
+    			if ($tableName && is_array($fieldName) && $dataType) {
+    				return $this->resultReturn('ALTER TABLE '.$tableName.' '.$type.' '.$fieldName['old'].' '.$fieldName['new'].' '.$dataType.((isset($dataSize) && $dataSize != '') ? '('.$dataSize.');' : ''), $actDb);
     			}
     			
     			break;
     			
     		case 'ADD' :
-    			if ($tableName && $fieldName && $dataType && $dataSize) {
-    				return $this->resultReturn('ALTER TABLE '.$tableName.' '.$type.' '.$fieldName.' '.$dataType.'('.$dataSize.');', $actDb);
+    			if ($tableName && $fieldName && $dataType) {
+    				return $this->resultReturn('ALTER TABLE '.$tableName.' '.$type.' '.$fieldName.' '.$dataType.((isset($dataSize) && $dataSize != '') ? '('.$dataSize.');' : ''), $actDb);
     			}
     			break;
     			
