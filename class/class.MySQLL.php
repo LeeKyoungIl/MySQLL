@@ -41,7 +41,7 @@ Class MySQLL {
 	private $queryLog = Array();
 	
 	private $phpVersion = null;
-	private $queryErrorLogPath = '/home/cloud-data-repository/query_log/';
+	private $queryErrorLogPath = 'your log path';
 	
 	/**
      * Construct Class
